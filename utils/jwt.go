@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"time"
 )
@@ -8,9 +9,10 @@ import (
 var jwtKey = []byte("secret_key") // Burada gizli bir anahtar tanımlıyoruz (daha güvenli bir anahtar kullanın)
 
 // JWT oluşturma fonksiyonu
-func GenerateJWT(username string) (string, error) {
+func GenerateJWT(username, role string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": username,
+		"role":     role,
 		"exp":      time.Now().Add(time.Hour * 24).Unix(), // Token süresi: 24 saat
 	})
 
@@ -21,14 +23,38 @@ func GenerateJWT(username string) (string, error) {
 	return tokenString, nil
 }
 
-// JWT doğrulama fonksiyonu
-func ValidateJWT(tokenString string) (*jwt.Token, error) {
+// Kullanıcı rolünü almak için JWT doğrulama fonksiyonu
+func GetUserRoleFromJWT(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	return token, nil
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		role := claims["role"].(string)
+		return role, nil
+	}
+
+	return "", fmt.Errorf("Geçersiz token")
+}
+
+// JWT'den kullanıcı adını almak için fonksiyon
+func GetUsernameFromJWT(tokenString string) (string, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		username := claims["username"].(string)
+		return username, nil
+	}
+
+	return "", fmt.Errorf("Geçersiz token")
 }
