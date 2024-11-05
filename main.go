@@ -1,22 +1,33 @@
 package main
 
 import (
+	"encoding/json"
+	"github.com/gorilla/mux"
+	"gogpt/config"
+	"gogpt/models" // Aynı şekilde modül adını kullanarak models paketine erişiyoruz
 	"log"
 	"net/http"
-
-	"github.com/gorilla/mux"
 )
 
 func main() {
-	// Router oluşturuluyor
+	// Veritabanına bağlan
+	config.Connect()
+
+	// Router oluştur
 	router := mux.NewRouter()
 
-	// Basit bir test rotası ekleyelim
-	router.HandleFunc("/api/test", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Admin panel API çalışıyor!"))
-	})
+	// Kullanıcıları listelemek için rota
+	router.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
+		users, err := models.GetAllUsers()
+		if err != nil {
+			http.Error(w, "Kullanıcılar alınamadı", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(users)
+	}).Methods("GET")
 
-	// Sunucu başlatılıyor
+	// Sunucuyu başlat
 	log.Println("Sunucu 8000 portunda dinleniyor...")
 	log.Fatal(http.ListenAndServe(":8000", router))
 }
