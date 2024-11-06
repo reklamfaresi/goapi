@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -81,6 +82,10 @@ func main() {
 				return
 			}
 			newUser.Password = string(hashedPassword)
+
+			// Oluşturma tarihi ekleyin
+			newUser.CreatedAt = time.Now()
+			newUser.UpdatedAt = time.Now()
 
 			err = models.CreateUser(newUser)
 			if err != nil {
@@ -163,6 +168,7 @@ func main() {
 			}
 
 			updatedUser.ID = id
+			updatedUser.UpdatedAt = time.Now() // Güncellenme tarihi
 
 			err = models.UpdateUser(updatedUser)
 			if err != nil {
@@ -234,7 +240,113 @@ func main() {
 		}
 	}).Methods("PUT")
 
+	// Entegrasyon ayarlarını almak ve güncellemek için rota
+	router.HandleFunc("/api/integrations", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			integration, err := models.GetIntegrations()
+			if err != nil {
+				http.Error(w, "Entegrasyon ayarları alınamadı", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(integration)
+		} else if r.Method == http.MethodPut {
+			var updatedIntegration models.Integration
+			err := json.NewDecoder(r.Body).Decode(&updatedIntegration)
+			if err != nil {
+				http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+				return
+			}
+
+			updatedIntegration.UpdatedAt = time.Now() // Güncellenme tarihi
+
+			err = models.UpdateIntegrations(updatedIntegration)
+			if err != nil {
+				http.Error(w, "Entegrasyon ayarları güncellenemedi", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "Entegrasyon ayarları başarıyla güncellendi"})
+		} else {
+			http.Error(w, "Yöntem desteklenmiyor", http.StatusMethodNotAllowed)
+		}
+	}).Methods("GET", "PUT")
+
+	// Slider CRUD işlemleri
+	router.HandleFunc("/api/sliders", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			sliders, err := models.GetAllSliders()
+			if err != nil {
+				http.Error(w, "Sliderlar alınamadı", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(sliders)
+		} else if r.Method == http.MethodPost {
+			var newSlider models.Slider
+			err := json.NewDecoder(r.Body).Decode(&newSlider)
+			if err != nil {
+				http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+				return
+			}
+
+			newSlider.CreatedAt = time.Now()
+			newSlider.UpdatedAt = time.Now()
+
+			err = models.CreateSlider(newSlider)
+			if err != nil {
+				http.Error(w, "Slider oluşturulamadı", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]string{"message": "Slider başarıyla oluşturuldu"})
+		} else {
+			http.Error(w, "Yöntem desteklenmiyor", http.StatusMethodNotAllowed)
+		}
+	}).Methods("GET", "POST")
+
+	router.HandleFunc("/api/sliders/{id}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		id, err := strconv.Atoi(vars["id"])
+		if err != nil {
+			http.Error(w, "Geçersiz slider ID'si", http.StatusBadRequest)
+			return
+		}
+
+		if r.Method == http.MethodPut {
+			var updatedSlider models.Slider
+			err := json.NewDecoder(r.Body).Decode(&updatedSlider)
+			if err != nil {
+				http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+				return
+			}
+
+			updatedSlider.ID = id
+			updatedSlider.UpdatedAt = time.Now() // Güncellenme tarihi
+
+			err = models.UpdateSlider(updatedSlider)
+			if err != nil {
+				http.Error(w, "Slider güncellenemedi", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "Slider başarıyla güncellendi"})
+		} else if r.Method == http.MethodDelete {
+			err = models.DeleteSlider(id)
+			if err != nil {
+				http.Error(w, "Slider silinemedi", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "Slider başarıyla silindi"})
+		} else {
+			http.Error(w, "Yöntem desteklenmiyor", http.StatusMethodNotAllowed)
+		}
+	}).Methods("PUT", "DELETE")
+
 	// Sunucuyu başlat
-	log.Println("Sunucu 8000 portunda dinleniyor...")
+	log.Println("Sunucu başlatılıyor: http://localhost:8000")
 	log.Fatal(http.ListenAndServe(":8000", router))
 }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slider Yönetimi</title>
+</head>
+<body>
+<h1>Slider Yönetimi</h1>
+<div id="sliders"></div>
+
+<button onclick="showCreateForm()">Yeni Slider Ekle</button>
+<div id="createForm" style="display:none;">
+    <h3>Yeni Slider</h3>
+    <input type="text" id="title" placeholder="Başlık">
+    <input type="text" id="description" placeholder="Açıklama">
+    <input type="text" id="imageURL" placeholder="Görsel URL">
+    <input type="text" id="languageCode" placeholder="Dil Kodu">
+    <button onclick="createSlider()">Ekle</button>
+</div>
+
+<script>
+    async function loadSliders() {
+        const response = await fetch('/api/sliders');
+        const sliders = await response.json();
+        const slidersDiv = document.getElementById('sliders');
+        slidersDiv.innerHTML = '';
+
+        sliders.forEach(slider => {
+            const sliderDiv = document.createElement('div');
+            sliderDiv.innerHTML = `
+                    <p>${slider.title} - ${slider.description} - Aktif: ${slider.is_active}</p>
+                    <button onclick="deleteSlider(${slider.id})">Sil</button>
+                `;
+            slidersDiv.appendChild(sliderDiv);
+        });
+    }
+
+    function showCreateForm() {
+        document.getElementById('createForm').style.display = 'block';
+    }
+
+    async function createSlider() {
+        const title = document.getElementById('title').value;
+        const description = document.getElementById('description').value;
+        const imageURL = document.getElementById('imageURL').value;
+        const languageCode = document.getElementById('languageCode').value;
+
+        const response = await fetch('/api/sliders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                description: description,
+                image_url: imageURL,
+                language_code: languageCode,
+                is_active: true
+            })
+        });
+
+        if (response.ok) {
+            loadSliders();
+            document.getElementById('createForm').style.display = 'none';
+        } else {
+            alert('Slider eklenemedi');
+        }
+    }
+
+    async function deleteSlider(id) {
+        const response = await fetch(`/api/sliders/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            loadSliders();
+        } else {
+            alert('Slider silinemedi');
+        }
+    }
+
+    loadSliders();
+</script>
+</body>
+</html>

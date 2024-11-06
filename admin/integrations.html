@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entegrasyon Ayarları</title>
+</head>
+<body>
+<h1>Entegrasyon Ayarları</h1>
+<form id="integrationForm">
+    <label for="googleAnalyticsID">Google Analytics ID:</label>
+    <input type="text" id="googleAnalyticsID" name="googleAnalyticsID"><br><br>
+
+    <label for="facebookPixelID">Facebook Pixel ID:</label>
+    <input type="text" id="facebookPixelID" name="facebookPixelID"><br><br>
+
+    <button type="button" onclick="updateIntegrations()">Güncelle</button>
+</form>
+
+<script>
+    async function updateIntegrations() {
+        const googleAnalyticsID = document.getElementById('googleAnalyticsID').value;
+        const facebookPixelID = document.getElementById('facebookPixelID').value;
+
+        const response = await fetch('/api/integrations', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                google_analytics_id: googleAnalyticsID,
+                facebook_pixel_id: facebookPixelID
+            })
+        });
+
+        if (response.ok) {
+            alert('Ayarlar başarıyla güncellendi');
+        } else {
+            alert('Ayarlar güncellenemedi');
+        }
+    }
+
+    // Sayfa yüklendiğinde mevcut ayarları çekelim
+    window.onload = async function() {
+        const response = await fetch('/api/integrations');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('googleAnalyticsID').value = data.google_analytics_id || '';
+            document.getElementById('facebookPixelID').value = data.facebook_pixel_id || '';
+        }
+    }
+</script>
+</body>
+</html>

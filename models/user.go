@@ -1,115 +1,104 @@
 package models
 
 import (
-	"fmt"
+	"database/sql"
+	"errors"
 	"gogpt/config"
 	"golang.org/x/crypto/bcrypt"
+	"time"
 )
 
-// Kullanıcı yapısı (model)
+// User yapısı
 type User struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Role     string `json:"role"`
+	ID        int       `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	Role      string    `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Kullanıcıları veritabanından çekmek için bir fonksiyon
-func GetAllUsers() ([]User, error) {
-	rows, err := config.DB.Query("SELECT id, username, email, role FROM users")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var users []User
-
-	for rows.Next() {
-		var user User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Role); err != nil {
-			return nil, err
-		}
-		users = append(users, user)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return users, nil
-}
-
-// Yeni bir kullanıcı eklemek için fonksiyon (şifre hashleme ile)
+// Yeni kullanıcı oluşturmak için fonksiyon
 func CreateUser(user User) error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-
-	query := "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)"
-	_, err = config.DB.Exec(query, user.Username, string(hashedPassword), user.Email, user.Role)
-	if err != nil {
-		return err
-	}
-	return nil
+	query := "INSERT INTO users (username, email, password, role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+	_, err := config.DB.Exec(query, user.Username, user.Email, user.Password, user.Role, user.CreatedAt, user.UpdatedAt)
+	return err
 }
 
-// Kullanıcı kimlik doğrulama fonksiyonu (bcrypt kullanarak)
+// Kullanıcı adı veya e-posta adresine göre kullanıcının zaten var olup olmadığını kontrol etmek için fonksiyon
+func CheckUserExists(username, email string) (bool, error) {
+	query := "SELECT COUNT(*) FROM users WHERE username = ? OR email = ?"
+	var count int
+	err := config.DB.QueryRow(query, username, email).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// Kullanıcı doğrulamak için fonksiyon
 func AuthenticateUser(username, password string) (*User, error) {
 	var user User
-	query := "SELECT id, username, password, email, role FROM users WHERE username = ?"
-	err := config.DB.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.Password, &user.Email, &user.Role)
+	query := "SELECT id, username, email, password, role, created_at, updated_at FROM users WHERE username = ?"
+	err := config.DB.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("kullanıcı bulunamadı")
+		}
 		return nil, err
 	}
 
-	// Kullanıcının verdiği şifre ile veritabanındaki hash'i karşılaştır
+	// Şifre doğrulaması
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, fmt.Errorf("geçersiz şifre")
+		return nil, errors.New("şifre hatalı")
 	}
 
 	return &user, nil
 }
 
-// Kullanıcıyı güncellemek için fonksiyon
+// Tüm kullanıcıları almak için fonksiyon
+func GetAllUsers() ([]User, error) {
+	var users []User
+	rows, err := config.DB.Query("SELECT id, username, email, role, created_at, updated_at FROM users")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+// Kullanıcı güncellemek için fonksiyon
 func UpdateUser(user User) error {
-	query := "UPDATE users SET username = ?, email = ?, role = ? WHERE id = ?"
-	_, err := config.DB.Exec(query, user.Username, user.Email, user.Role, user.ID)
+	query := "UPDATE users SET username = ?, email = ?, role = ?, updated_at = ? WHERE id = ?"
+	_, err := config.DB.Exec(query, user.Username, user.Email, user.Role, user.UpdatedAt, user.ID)
+	return err
+}
+
+// Kullanıcı profili güncellemek için fonksiyon
+func UpdateUserProfile(username, email, password string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	return nil
+	query := "UPDATE users SET email = ?, password = ?, updated_at = NOW() WHERE username = ?"
+	_, err = config.DB.Exec(query, email, hashedPassword, username)
+	return err
 }
 
-// Kullanıcıyı silmek için fonksiyon
+// Kullanıcı silmek için fonksiyon
 func DeleteUser(id int) error {
 	query := "DELETE FROM users WHERE id = ?"
 	_, err := config.DB.Exec(query, id)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Kullanıcı profilini güncellemek için fonksiyon
-func UpdateUserProfile(username, email, hashedPassword string) error {
-	query := "UPDATE users SET email = ?, password = ? WHERE username = ?"
-	_, err := config.DB.Exec(query, email, hashedPassword, username)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Kullanıcının mevcut olup olmadığını kontrol etmek için fonksiyon
-func CheckUserExists(username, email string) (bool, error) {
-	var exists bool
-	query := "SELECT EXISTS(SELECT 1 FROM users WHERE username = ? OR email = ?)"
-	err := config.DB.QueryRow(query, username, email).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
+	return err
 }
