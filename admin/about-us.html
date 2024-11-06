@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Us Management</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+</head>
+<body>
+<div class="container">
+  <h1>About Us Management</h1>
+  <div id="about-us-list"></div>
+
+  <button onclick="showCreateForm()">Add New About Us Section</button>
+  <div id="createForm" style="display:none;">
+    <h3>New About Us Section</h3>
+    <input type="text" id="section" placeholder="Section (e.g., History, Mission)">
+    <textarea id="content" placeholder="Content"></textarea>
+    <input type="text" id="languageCode" placeholder="Language Code (e.g., en, tr)">
+    <button onclick="createAboutUs()">Add</button>
+  </div>
+</div>
+
+<script>
+  async function loadAboutUs() {
+    const response = await fetch('/api/about-us?lang=en');
+    const aboutUsSections = await response.json();
+    const aboutUsListDiv = document.getElementById('about-us-list');
+    aboutUsListDiv.innerHTML = '';
+
+    aboutUsSections.forEach(section => {
+      const sectionDiv = document.createElement('div');
+      sectionDiv.innerHTML = `
+                    <h4>${section.section}</h4>
+                    <p>${section.content}</p>
+                    <button onclick="deleteAboutUs(${section.id})">Delete</button>
+                `;
+      aboutUsListDiv.appendChild(sectionDiv);
+    });
+  }
+
+  function showCreateForm() {
+    document.getElementById('createForm').style.display = 'block';
+  }
+
+  async function createAboutUs() {
+    const section = document.getElementById('section').value;
+    const content = document.getElementById('content').value;
+    const languageCode = document.getElementById('languageCode').value;
+
+    const response = await fetch('/api/about-us', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        section: section,
+        content: content,
+        language_code: languageCode
+      })
+    });
+
+    if (response.ok) {
+      loadAboutUs();
+      document.getElementById('createForm').style.display = 'none';
+    } else {
+      alert('Failed to add About Us section');
+    }
+  }
+
+  async function deleteAboutUs(id) {
+    const response = await fetch(`/api/about-us/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      loadAboutUs();
+    } else {
+      alert('Failed to delete About Us section');
+    }
+  }
+
+  loadAboutUs();
+</script>
+</body>
+</html>

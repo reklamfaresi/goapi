@@ -346,6 +346,75 @@ func main() {
 		}
 	}).Methods("PUT", "DELETE")
 
+	// About Us CRUD işlemleri
+	router.HandleFunc("/api/about-us", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			languageCode := r.URL.Query().Get("lang")
+			if languageCode == "" {
+				languageCode = "en" // Varsayılan dil İngilizce
+			}
+			aboutUsSections, err := models.GetAllAboutUs(languageCode)
+			if err != nil {
+				http.Error(w, "About Us bölümleri alınamadı", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(aboutUsSections)
+		} else if r.Method == http.MethodPost {
+			var newAboutUs models.AboutUs
+			err := json.NewDecoder(r.Body).Decode(&newAboutUs)
+			if err != nil {
+				http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+				return
+			}
+			err = models.CreateAboutUs(newAboutUs)
+			if err != nil {
+				http.Error(w, "About Us bölümü oluşturulamadı", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(map[string]string{"message": "About Us bölümü başarıyla oluşturuldu"})
+		} else {
+			http.Error(w, "Yöntem desteklenmiyor", http.StatusMethodNotAllowed)
+		}
+	}).Methods("GET", "POST")
+
+	router.HandleFunc("/api/about-us/{id}", func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		id, err := strconv.Atoi(vars["id"])
+		if err != nil {
+			http.Error(w, "Geçersiz About Us ID'si", http.StatusBadRequest)
+			return
+		}
+
+		if r.Method == http.MethodPut {
+			var updatedAboutUs models.AboutUs
+			err := json.NewDecoder(r.Body).Decode(&updatedAboutUs)
+			if err != nil {
+				http.Error(w, "Geçersiz veri formatı", http.StatusBadRequest)
+				return
+			}
+			updatedAboutUs.ID = id
+			err = models.UpdateAboutUs(updatedAboutUs)
+			if err != nil {
+				http.Error(w, "About Us bölümü güncellenemedi", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "About Us bölümü başarıyla güncellendi"})
+		} else if r.Method == http.MethodDelete {
+			err = models.DeleteAboutUs(id)
+			if err != nil {
+				http.Error(w, "About Us bölümü silinemedi", http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "About Us bölümü başarıyla silindi"})
+		} else {
+			http.Error(w, "Yöntem desteklenmiyor", http.StatusMethodNotAllowed)
+		}
+	}).Methods("PUT", "DELETE")
+
 	// Sunucuyu başlat
 	log.Println("Sunucu başlatılıyor: http://localhost:8000")
 	log.Fatal(http.ListenAndServe(":8000", router))
